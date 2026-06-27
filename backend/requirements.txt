@@ -1,0 +1,26 @@
+# Core Web Framework
+fastapi==0.104.1
+uvicorn==0.24.0
+python-multipart==0.0.6
+
+# AI - Groq (Pure Python)
+groq==0.4.1
+
+# Database - SQLite (Built into Python)
+sqlalchemy==2.0.23
+
+# Authentication
+python-jose==3.3.0
+passlib==1.7.4
+bcrypt==4.1.2
+
+# Utilities
+python-dotenv==1.0.0
+pydantic==2.5.0
+email-validator==2.1.0
+
+# HTTP Client
+httpx==0.25.1
+
+# Production WSGI Server
+gunicorn==21.2.0
