@@ -298,6 +298,82 @@ Feature: User Login
         raise HTTPException(status_code=500, detail=f"Error generating Gherkin: {str(e)}")
 
 
+
+
+# ==================== F12: BUG REPORT GENERATOR ====================
+
+class BugReportInput(BaseModel):
+    description: str
+    steps_to_reproduce: Optional[str] = ""
+    environment: Optional[str] = ""
+    severity: Optional[str] = "Major"
+
+@app.post("/api/generate-bug-report")
+async def generate_bug_report(request: BugReportInput):
+    """Generate a structured Jira-ready bug report from a description"""
+    if not os.getenv("GROQ_API_KEY"):
+        raise HTTPException(status_code=500, detail="Groq API key not configured")
+
+    try:
+        import random, string
+        bug_id = "BUG-" + "".join(random.choices(string.digits, k=4))
+
+        prompt = f"""You are a senior QA engineer. Generate a complete, professional bug report in JSON format.
+
+BUG DESCRIPTION: {request.description}
+STEPS PROVIDED: {request.steps_to_reproduce or "Not provided"}
+ENVIRONMENT: {request.environment or "Not specified"}
+SEVERITY: {request.severity}
+
+Return ONLY valid JSON with this exact structure:
+{{
+  "bug_id": "{bug_id}",
+  "title": "Short, clear bug title (max 10 words)",
+  "severity": "{request.severity}",
+  "priority": "High or Medium or Low",
+  "environment": "Full environment details",
+  "description": "Clear 2-3 sentence description of the bug",
+  "steps_to_reproduce": [
+    "Step 1: ...",
+    "Step 2: ...",
+    "Step 3: ..."
+  ],
+  "actual_result": "What actually happens",
+  "expected_result": "What should happen",
+  "possible_root_cause": "Brief technical guess at root cause",
+  "suggested_fix": "Brief suggestion for developers",
+  "labels": ["bug", "relevant-label", "component-label"]
+}}
+
+IMPORTANT: Return ONLY the JSON object, nothing else."""
+
+        system_msg = {"role": "system", "content": "You are a senior QA engineer. Return only valid JSON bug reports. No markdown, no explanations."}
+        user_msg = {"role": "user", "content": prompt}
+
+        chat_completion = groq_client.chat.completions.create(
+            messages=[system_msg, user_msg],
+            model="llama-3.3-70b-versatile",
+            temperature=0.5,
+            max_tokens=1500,
+            stream=False
+        )
+
+        content_str = chat_completion.choices[0].message.content.strip()
+
+        if content_str.startswith("```"):
+            content_str = content_str.split("```")[1]
+            if content_str.startswith("json"):
+                content_str = content_str[4:]
+        content_str = content_str.strip()
+
+        report = json.loads(content_str)
+        return report
+
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse AI response: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating bug report: {str(e)}")
+
 @app.post("/api/export/csv")
 async def export_to_csv(test_cases: List[TestCase]):
     import csv
